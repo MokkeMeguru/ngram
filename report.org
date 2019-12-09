@@ -1,0 +1,30 @@
+#+latex_class: article
+#+latex_class_options:
+#+latex_header: \usepackage{algorithm}
+#+latex_header: \usepackage{algorithmic}
+#+latex_header_extra:
+#+description:
+#+keywords:
+#+subtitle:
+#+latex_compiler: pdflatex
+#+date: \today
+
+データ構造 ngram
+{word: 単語ID
+ freq: 通過した頻度
+ children: list<ngram>
+}
+
+データの挿入方法
+
+文からngram を作る。
+
+#+CAPTION: 3-gram モデルを作る
+#+begin_example
+<1 2 3 4 5 6> -> {<1 2 3> <2 3 4> <3 4 5> <4 5 6> <5 6 OUT> <6 OUT OUT>}
+#+end_example
+
+データ構造にトラックする。
+
+\begin
+root \LeftArrow
