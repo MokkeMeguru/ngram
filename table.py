@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import pandas as pd
 from pathlib import Path
 import numpy as np
@@ -21,7 +22,7 @@ def read_table(path: Path) -> np.array:
 
 def convert_ngrams(raw_table: np.array, order: int = 3) -> pd.DataFrame:
     ngrams = []
-    for seq in raw_table:
+    for seq in tqdm(raw_table):
         # seq : [1, 2, 3, -1, -1]
         ngram = [seq[i:i + order] for i in range(len(seq) - order + 1)]
         ngrams += ngram
@@ -39,21 +40,42 @@ class GramTable:
         self.n3 = (self.ngramdf['2nd'] != -1).sum()
         self.n2 = (self.ngramdf['3rd'] != -1).sum()
         self.d1 = self.n1 / (self.n1 + 2 * self.n2)
-        self.d2 = self.n2 / (self.n2 + 2* self.n3)
+        self.d2 = self.n2 / (self.n2 + 2 * self.n3)
+
+    def Sigma_K(self, wlist: list):
+        if len(wlist) == 0:
+            return len(self.ngramdf[(self.ngramdf ['2nd'] != -1)].groupby (['1st', '2nd']).count())
+        if len(wlist) == 1:
+            return len(self.ngramdf[(self.ngramdf['2nd'] == wlist[0]) &
+                                    (self.ngramdf ['3rd'] != -1)].groupby(['1st', '3rd']).count())
+        else:
+            raise Exception ('not implemented')
+    def Sigma_C(self, wlist: list):
+        if len(wlist) == 1:
+            return ((self.ngramdf['1st'] == wlist[0]) &
+                    (self.ngramdf['2nd'] != -1)).sum ()
+        if len (wlist) == 2:
+            return ((self.ngramdf ['1st'] == wlist [0]) &
+                    (self.ngramdf ['2nd'] == wlist [1]) &
+                    (self.ngramdf ['3rd'] != -1)).sum ()
+        else:
+            raise Exception ('not implemented')
 
     def C(self, wlist: list):
         if len(wlist) == 1:
             # wlist = [w1] -> C(w1)
             return (self.ngramdf['1st'] == wlist[0]).sum()
         if len(wlist) == 2:
-            # wlist = [w1 w1] -> C(w1, w2)
+            # wlist = [w1 w2] -> C(w1, w2)
             return ((self.ngramdf['1st'] == wlist[0]) &
                     (self.ngramdf['2nd'] == wlist[1])).sum()
         if len(wlist) == 3:
-            # wlist = [w1 w1] -> C(w1, w2, w3)
+            # wlist = [w1 w2 w3] -> C(w1, w2, w3)
             return ((self.ngramdf['1st'] == wlist[0]) &
                     (self.ngramdf['2nd'] == wlist[1]) &
                     (self.ngramdf['3rd'] == wlist[2])).sum()
+        else:
+            raise Exception ('not implemented')
 
     def K(self, wlist: list):
         if len(wlist) == 1:
@@ -62,34 +84,57 @@ class GramTable:
                 self.ngramdf['2nd'] == wlist[0])]['1st'].unique())
         if len(wlist) == 2:
             # wlist = [w2 w3] -> K(w2, w3) -> 'xw2w3' の x の種類数
-            return len(self.ngramdf[(self.ngramdf['2nd'] == wlist[0]) & (
-                self.ngramdf['3rd'] == wlist[1])]['1st'].unique())
+            return len(self.ngramdf[((self.ngramdf['2nd'] == wlist[0]) &
+                                     (self.ngramdf['3rd'] == wlist[1]))]['1st'].unique())
+        else:
+            raise Exception ('not implemented')
 
-    def N(self, wlist: list, order):
+    def N_c (self, wlist: list):
         """calculation of N_{1+}^{'}(...)
         """
-        if len(wlist) == 1:
-            # wlist = [w1] = |{u: c'(h, u) > 0}|
-            if len(wlist) == order - 1:
-                # if |h| = n - 1
-                # -> c(w1, u) が 0 より大きい u の種類数
-                return len(self.ngramdf[(
-                    (self.ngramdf['1st'] == wlist[0]) &
-                    (self.ngramdf['2nd'] != -1))]['2nd'].unique())
-            else:
-                # if |h| < n - 1
-                # -> K(w1, u) (-> 'xw1u' の x の種類数) が 0 より大きい u の種類数
-                return len(self.ngramdf[(
-                    (self.ngramdf['2nd'] == wlist[0]) &
-                    (self.ngramdf['3rd'] != -1))]['3rd'].unique())
+        if len (wlist) == 1:
+            return len (self.ngramdf [((self.ngramdf ['1st'] == wlist [0]) &
+                                       (self.ngramdf ['2nd'] != -1))] ['2nd'].unique ())
+        if len (wlist) == 2:
+            return len (self.ngramdf [((self.ngramdf ['1st'] == wlist [0]) &
+                                       (self.ngramdf ['2nd'] == wlist [1]) &
+                                       (self.ngramdf ['3rd'] != -1))]['3rd'].unique ())
         else:
-            # wlist = [w1, w2]
-            # -> c(w1, u) が 0 より大きい u の種類数
-            # この GramTable は trigram までが対応範囲
-            return len(
-                self.ngramdf[((self.ngramdf['1st'] == wlist[0]) &
-                              (self.ngramdf['2nd'] == wlist[1]) &
-                              (self.ngramdf['3rd'] != -1))]['3rd'].unique())
+            raise Exception ('not implemented')
+
+    def N_k (self, wlist: list):
+        """calculation of N_{1+}^{'}(...)
+        """
+        if len (wlist) == 1:
+            return len (self.ngramdf [((self.ngramdf ['2nd'] ==wlist [0]) &
+                                       (self.ngramdf ['3rd'] != -1))] ['3rd'].unique ())
+        else:
+            raise Exception ('not implemented')
+
+    # def N(self, wlist: list, order):
+        
+    #     if len(wlist) == 1:
+    #         # wlist = [w1] = |{u: c'(h, u) > 0}|
+    #         if len(wlist) == order - 1:
+    #             # if |h| = n - 1
+    #             # -> c(w1, u) が 0 より大きい u の種類数
+    #             return len(self.ngramdf[(
+    #                 (self.ngramdf['1st'] == wlist[0]) &
+    #                 (self.ngramdf['2nd'] != -1))]['2nd'].unique())
+    #         else:
+    #             # if |h| < n - 1
+    #             # -> K(w1, u) (-> 'xw1u' の x の種類数) が 0 より大きい u の種類数
+    #             return len(self.ngramdf[(
+    #                 (self.ngramdf['2nd'] == wlist[0]) &
+    #                 (self.ngramdf['3rd'] != -1))]['3rd'].unique())
+    #     else:
+    #         # wlist = [w1, w2]
+    #         # -> c(w1, u) が 0 より大きい u の種類数
+    #         # この GramTable は trigram までが対応範囲
+    #         return len(
+    #             self.ngramdf[((self.ngramdf['1st'] == wlist[0]) &
+    #                           (self.ngramdf['2nd'] == wlist[1]) &
+    #                           (self.ngramdf['3rd'] != -1))]['3rd'].unique())
 
 
 def main():
